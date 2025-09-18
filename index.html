@@ -7,7 +7,7 @@
   <meta name="description" content="Simple writing editor for book chapters">
   
   <!-- Tailwind CSS -->
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="public/styles.css">
 
   <!-- Prevent FOUC (Flash of Unstyled Content) -->
   <style>
@@ -134,12 +134,11 @@
     // Load available files
     async function loadFiles() {
       try {
-        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.files}`);
-        const data = await response.json();
-        
+        const data = await window.electronAPI.getFiles();
+
         const select = document.getElementById('fileSelect');
         select.innerHTML = '<option value="">Chapters...</option>';
-        
+
         data.files.forEach((file) => {
           const option = document.createElement('option');
           option.value = file;
@@ -157,17 +156,7 @@
       }
     }
 
-    // API Configuration
-    const API_CONFIG = {
-      baseUrl: 'http://localhost:3001',
-      endpoints: {
-        notes: (filename) => `/api/notes/${filename}`,
-        note: (id) => `/api/note/${id}`,
-        updateNote: (id) => `/api/note/${id}`,
-        append: '/api/append',
-        files: '/api/files'
-      }
-    };
+    // Electron API is now the only interface
 
     // Text Processing Utilities
     const TextUtils = {
@@ -490,10 +479,7 @@
     // Get existing note IDs from a file
     async function getExistingNoteIds(filename) {
       try {
-        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.notes(filename)}`);
-        if (!response.ok) return new Set();
-        
-        const data = await response.json();
+        const data = await window.electronAPI.getNotes(filename);
         return new Set(data.notes?.map((note) => note.id) || []);
       } catch (error) {
         console.warn('Failed to fetch existing note IDs:', error);
@@ -585,32 +571,14 @@
       submitBtn.disabled = true;
 
       try {
-        let response;
+        let result;
         if (isEditMode) {
           // Update existing note
-          response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.updateNote(currentNoteId)}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ 
-              filename, 
-              content: finalContent,
-              noteId: currentNoteId
-            })
-          });
+          result = await window.electronAPI.updateNote(currentNoteId, filename, finalContent);
         } else {
           // Append new note
-          response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.append}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ filename, content: finalContent })
-          });
+          result = await window.electronAPI.appendContent(filename, finalContent);
         }
-
-        const result = await response.json();
         
         if (result.success) {
           if (isEditMode) {
@@ -911,8 +879,7 @@
       }
 
       try {
-        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.notes(filename)}`);
-        const data = await response.json();
+        const data = await window.electronAPI.getNotes(filename);
         
         if (data.notes && data.notes.length > 0) {
           EditorState.allNotes = data.notes.map(note => ({
@@ -1016,12 +983,7 @@
     // Load note by ID
     async function loadNoteById(noteId) {
       try {
-        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.note(noteId)}`);
-        if (!response.ok) {
-          throw new Error('Note not found');
-        }
-        
-        const data = await response.json();
+        const data = await window.electronAPI.getNote(noteId);
         
         // Populate the form
         const fileSelect = document.getElementById('fileSelect');
