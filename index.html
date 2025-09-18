@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Writer</title>
+  <meta name="description" content="Simple writing editor for book chapters">
+  
+  <!-- Tailwind CSS -->
+  <link rel="stylesheet" href="/styles.css">
+
+  <!-- Prevent FOUC (Flash of Unstyled Content) -->
+  <style>
+    body { visibility: hidden; }
+  </style>
+  <script>
+    // Show page only after files are loaded
+    window.addEventListener('load', async () => {
+      // Wait for files to load before showing the page
+      await loadFiles();
+      document.body.style.visibility = 'visible';
+    });
+  </script>
+</head>
+<body class="bg-white">
+  <!-- Fixed header -->
+  <header class="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-md z-10">
+    <div class="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <select 
+          id="fileSelect" 
+          name="filename" 
+          class="text-xs border-none bg-transparent focus:outline-none text-gray-400 hover:text-gray-600 transition-colors appearance-none cursor-pointer"
+        >
+          <option value="">Chapters...</option>
+        </select>
+        
+        <div class="relative">
+          <input 
+            id="noteIdSelect" 
+            name="noteId" 
+            type="text"
+            placeholder="Note"
+            class="text-sm font-normal border-none bg-transparent focus:outline-none text-gray-400 focus:text-gray-600 transition-colors w-36 placeholder-gray-300"
+            disabled
+            autocomplete="off"
+          />
+          <div id="noteIdDropdown" class="absolute top-full left-0 bg-white/95 border border-gray-100 rounded-lg shadow-lg z-20 w-48 max-h-56 overflow-y-auto hidden backdrop-blur-sm">
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <button
+          type="submit"
+          form="editorForm"
+          class="bg-transparent hover:bg-gray-50 text-gray-300 hover:text-gray-500 text-xs px-3 py-1.5 rounded font-light transition-colors duration-200"
+          title="Use Ctrl+Enter or Cmd+Enter instead"
+        >
+          ⌘↵
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Writing area -->
+  <main class="pt-20 min-h-screen bg-gradient-to-br from-gray-50 to-white">
+    <div class="max-w-3xl mx-auto px-6 py-12">
+      <form id="editorForm" class="flex flex-col gap-6">
+        <!-- Writing Section -->
+        <div class="relative">
+          <textarea 
+            id="contentArea" 
+            name="content" 
+            class="w-full min-h-[200px] resize-none border border-gray-200 rounded-lg p-4 outline-none text-base placeholder-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-gray-600"
+            placeholder="Write notes..."
+            style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif; word-spacing: -0.05em; letter-spacing: -0.01em; line-height: 1.6; overflow: hidden;"
+          ></textarea>
+          <div id="contentCounter" class="absolute bottom-2 right-3 text-xs text-gray-400 pointer-events-none">0</div>
+        </div>
+
+        <!-- Reference Section -->
+        <div class="relative">
+          <textarea 
+            id="referenceArea" 
+            name="reference" 
+            class="w-full min-h-[200px] resize-none border border-gray-200 rounded-lg p-4 outline-none text-sm placeholder-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-600"
+            placeholder="Quotes..."
+            style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif; word-spacing: -0.05em; letter-spacing: -0.01em; line-height: 1.6; background-color: #fafafa; overflow-y: auto;"
+          ></textarea>
+          <div id="sourceIndicator" class="absolute bottom-3 right-3 px-2 py-1 text-xs rounded-md transition-all duration-300 opacity-0 pointer-events-none">
+          </div>
+        </div>
+      </form>
+
+      <!-- Help hint -->
+      <div class="text-right mt-8 text-xs text-gray-300 font-light">
+        Press <kbd class="px-1 py-0.5 bg-gray-100 text-gray-400 rounded text-xs">.</kbd> for help
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast message -->
+  <div id="message" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-full shadow-lg transition-all duration-300 opacity-0 pointer-events-none">
+  </div>
+
+
+  <!-- Shortcut Helper Modal -->
+  <div id="shortcutHelper" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-800">Keyboard Shortcuts</h3>
+        <button id="closeShortcutHelper" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between"><span class="text-gray-600">/</span><span>Focus Note Content</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">]</span><span>Focus Quotes Area</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">e</span><span>Focus Note ID</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">Esc</span><span>Blur Current Field</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">⌘/Ctrl + Enter</span><span>Save & Clear</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">⌘/Ctrl + S</span><span>Save & Stay</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">⌘/Ctrl + L</span><span>Clear All</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">⌘/Ctrl + R</span><span>Load Recent</span></div>
+        <div class="flex justify-between"><span class="text-gray-600">⌘/Ctrl + Shift + R</span><span>Refresh Page</span></div>
+        <div class="flex justify-between"><span class="text-gray-600 font-semibold">.</span><span class="font-semibold">Show This Help</span></div>
+      </div>
+      <div class="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500 text-center">
+        Press <kbd class="px-1 py-0.5 bg-gray-100 rounded text-xs">Esc</kbd> or click outside to close
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Load available files
+    async function loadFiles() {
+      try {
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.files}`);
+        const data = await response.json();
+        
+        const select = document.getElementById('fileSelect');
+        select.innerHTML = '<option value="">Chapters...</option>';
+        
+        data.files.forEach((file) => {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file.replace(/\.(md|mdx)$/, '');
+          select.appendChild(option);
+        });
+
+        // Auto-select the most recently modified file
+        if (data.lastModified) {
+          select.value = data.lastModified;
+          await loadNotesForChapter(data.lastModified);
+        }
+      } catch (error) {
+        await UIFeedback.showMessage('Failed to load files', 'error');
+      }
+    }
+
+    // API Configuration
+    const API_CONFIG = {
+      baseUrl: 'http://localhost:3001',
+      endpoints: {
+        notes: (filename) => `/api/notes/${filename}`,
+        note: (id) => `/api/note/${id}`,
+        updateNote: (id) => `/api/note/${id}`,
+        append: '/api/append',
+        files: '/api/files'
+      }
+    };
+
+    // Text Processing Utilities
+    const TextUtils = {
+      countCharacters: function(text) {
+        if (!text.trim()) return 0;
+
+        let count = 0;
+        // Split by whitespace to get potential English words
+        const segments = text.trim().split(/\s+/);
+
+        for (const segment of segments) {
+          // For each segment, count Chinese characters individually and English words as 1
+          let englishWord = '';
+          for (const char of segment) {
+            if (/[\u4e00-\u9fff]/.test(char)) {
+              // Chinese character - count as 1 word
+              if (englishWord) {
+                count++; // Count accumulated English word
+                englishWord = '';
+              }
+              count++; // Count Chinese character
+            } else if (/[a-zA-Z0-9]/.test(char)) {
+              // English letter or number - accumulate
+              englishWord += char;
+            } else {
+              // Punctuation or other - end current English word
+              if (englishWord) {
+                count++;
+                englishWord = '';
+              }
+            }
+          }
+          // Don't forget the last English word in segment
+          if (englishWord) {
+            count++;
+          }
+        }
+
+        return count;
+      }
+    };
+
+    // UI Feedback System
+    const UIFeedback = {
+      isMessageShowing: false,
+
+      showMessage: async function(text, type, duration) {
+        const messageEl = document.getElementById('message');
+
+        // Prevent multiple simultaneous messages
+        if (this.isMessageShowing) {
+          return;
+        }
+
+        // Set message showing state
+        this.isMessageShowing = true;
+
+        messageEl.className = `fixed bottom-6 left-1/2 transform -translate-x-1/2 px-3 py-1.5 rounded-full shadow-md transition-all duration-300 text-xs ${
+          type === 'success'
+            ? 'bg-green-600 text-white'
+            : 'bg-orange-100 text-orange-800 border border-orange-200'
+        }`;
+        messageEl.textContent = text;
+        messageEl.style.opacity = '1';
+        messageEl.style.pointerEvents = 'auto';
+
+        // Auto-hide after delay
+        const hideDelay = duration || (type === 'error' ? 4000 : 2000);
+        await new Promise(resolve => setTimeout(resolve, hideDelay));
+
+        messageEl.style.opacity = '0';
+        messageEl.style.pointerEvents = 'none';
+
+        // Reset message showing state after animation
+        setTimeout(() => {
+          this.isMessageShowing = false;
+        }, 300);
+      }
+    };
+
+    // Show keyboard shortcut helper
+    function showShortcutHelper() {
+      const helper = document.getElementById('shortcutHelper');
+      helper.style.opacity = '1';
+      helper.style.pointerEvents = 'auto';
+    }
+
+    // Hide keyboard shortcut helper
+    function hideShortcutHelper() {
+      const helper = document.getElementById('shortcutHelper');
+      helper.style.opacity = '0';
+      helper.style.pointerEvents = 'none';
+    }
+
+    // Clear input areas and reset editor state
+    function clearEditorAndReset(isEditMode) {
+      const contentArea = document.getElementById('contentArea');
+      const referenceArea = document.getElementById('referenceArea');
+      
+      // Clear input areas
+      contentArea.value = '';
+      referenceArea.value = '';
+      autoResize(contentArea);
+      autoResize(referenceArea);
+      updateSourceIndicator(''); // Clear source indicator
+      updateCharacterCounter(contentArea, 'contentCounter'); // Reset counter
+      
+      if (isEditMode) {
+        // Reset note selection to append mode
+        const noteIdSelect = document.getElementById('noteIdSelect');
+        noteIdSelect.value = '';
+        EditorState.currentNoteId = '';
+        
+        // Re-enable reference area for new content
+        referenceArea.disabled = false;
+        referenceArea.style.backgroundColor = '#fafafa';
+        referenceArea.style.color = '';
+      }
+    }
+
+    // Auto-resize textarea while preserving scroll position
+    function autoResize(textarea, preserveScroll = true) {
+      // Save current state
+      const scrollTop = preserveScroll ? textarea.scrollTop : 0;
+      const maxScrollTop = textarea.scrollHeight - textarea.clientHeight;
+      
+      // Reset height to get accurate scrollHeight
+      textarea.style.height = 'auto';
+      
+      // Calculate new height with some padding
+      const newHeight = Math.max(textarea.scrollHeight + 10, 200);
+      textarea.style.height = newHeight + 'px';
+      
+      // Restore scroll position if preserving
+      if (preserveScroll && scrollTop > 0) {
+        // Ensure scroll position is valid for new height
+        const newMaxScroll = textarea.scrollHeight - textarea.clientHeight;
+        textarea.scrollTop = Math.min(scrollTop, Math.max(0, newMaxScroll));
+      }
+    }
+
+    // Detect potential source in reference text
+    function detectSource(text) {
+      const lines = text.trim().split('\n').filter(line => line.trim());
+      if (lines.length === 0) return { isSource: false, confidence: 0, reason: '' };
+      
+      const lastLine = lines[lines.length - 1].trim();
+      
+      // Comprehensive bibliography format patterns
+      const sourcePatterns = [
+        // Explicit source indicators
+        /^(Source|source|来源|出处|作者)[：:]\s*.+/i,
+        
+        // APA Format
+        /^[A-Z][a-zA-Z\s,.-]+\(\d{4}\)\./,                    // Author, A. (2024). Title
+        /.*\(\d{4}\)\.\s*.+\.\s*Journal/i,                    // (2024). Title. Journal
+        /.*\(\d{4},\s*[A-Z][a-z]+\s+\d{1,2}\)\./,           // (2024, March 15).
+        
+        // MLA Format  
+        /^[A-Z][a-zA-Z\s,.-]+".+"\s+.+\d{4}/,               // Author. "Title" Publication 2024
+        /.*Web\.\s+\d{1,2}\s+[A-Z][a-z]+\s+\d{4}/i,        // Web. 15 March 2024
+        
+        // Chicago Style
+        /.*\d{4}\):\s*\d+[-–]\d+\./,                         // 2024): 123-145.
+        /.*\d{4}\.\s*https?:\/\/.+/,                         // 2024. http://...
+        
+        // Harvard Style
+        /^[A-Z][a-zA-Z\s,.-]+\d{4},\s*'.+'.*$/,             // Author 2024, 'Title'
+        
+        // Vancouver Style (Numbered)
+        /^\d+\.\s+[A-Z][a-zA-Z\s,.-]+\d{4}/,                // 1. Author 2024
+        
+        // Chinese Academic Formats
+        /.*《.+》.*\d{4}/,                                    // 《书名》作者 2024
+        /.*［M］.*\d{4}/,                                     // [M] 2024 (Chinese monograph)
+        /.*［J］.*\d{4}/,                                     // [J] 2024 (Chinese journal)
+        /.*［N］.*\d{4}/,                                     // [N] 2024 (Chinese newspaper)
+        /.*［D］.*\d{4}/,                                     // [D] 2024 (Chinese dissertation)
+        /.*［R］.*\d{4}/,                                     // [R] 2024 (Chinese report)
+        /.*［P］.*\d{4}/,                                     // [P] 2024 (Chinese patent)
+        /.*［S］.*\d{4}/,                                     // [S] 2024 (Chinese standard)
+        /.*［EB\/OL］.*\d{4}/,                               // [EB/OL] 2024 (Chinese online)
+        
+        // General Academic Patterns
+        /.*,\s*vol\.\s*\d+.*\d{4}/i,                        // vol. 15, 2024
+        /.*,\s*no\.\s*\d+.*\d{4}/i,                         // no. 3, 2024  
+        /.*,\s*pp?\.\s*\d+[-–]\d+/i,                        // pp. 123-145
+        /.*,\s*p\.\s*\d+/i,                                  // p. 123
+        
+        // DOI and URLs
+        /.*doi:\s*10\.\d+/i,                                 // DOI
+        /.*DOI:\s*https?:\/\/doi\.org/i,                     // DOI URL
+        /^https?:\/\/.+/,                                    // Direct URL
+        
+        // ISBN and ISSN
+        /.*ISBN[\s:-]*\d{3}[-\s]?\d{1}[-\s]?\d{3}[-\s]?\d{5}[-\s]?\d{1}/i, // ISBN
+        /.*ISSN[\s:-]*\d{4}[-\s]?\d{4}/i,                   // ISSN
+        
+        // Publishers
+        /.*\b(University\s+Press|Cambridge|Oxford|MIT\s+Press|Springer|Elsevier|Wiley|Academic\s+Press|Norton|Penguin|Random\s+House)\b.*\d{4}/i,
+        /.*出版社.*\d{4}/,                                    // Chinese publishers
+        
+        // Thesis/Dissertation
+        /.*\b(PhD|Master[''']?s?|Dissertation|Thesis)\b.*\d{4}/i,
+        /.*硕士学位论文.*\d{4}/,                              // Chinese Master's thesis
+        /.*博士学位论文.*\d{4}/,                              // Chinese PhD thesis
+        
+        // Conference Proceedings
+        /.*\b(Proceedings?|Conference|Symposium|Workshop)\b.*\d{4}/i,
+        /.*会议论文.*\d{4}/,                                  // Chinese conference
+        
+        // News Articles
+        /.*\b(The\s+)?(New\s+York\s+Times|Washington\s+Post|Wall\s+Street\s+Journal|Guardian|BBC|CNN|Reuters)\b.*\d{4}/i,
+        /.*人民日报.*\d{4}/,                                  // People's Daily
+        /.*新华社.*\d{4}/,                                    // Xinhua
+        
+        // Government Documents
+        /.*\b(Government|Ministry|Department|Bureau|Agency|Commission)\b.*\d{4}/i,
+        /.*政府.*\d{4}/,                                      // Government (Chinese)
+        
+        // Legal Documents
+        /.*\b(Act|Law|Regulation|Code|Constitution|Treaty|Convention)\b.*\d{4}/i,
+        /.*法.*\d{4}/,                                        // Law (Chinese)
+        
+        // Date formats at end
+        /.*\b\d{1,2}[-\/]\d{1,2}[-\/]\d{4}$/,               // MM/DD/YYYY or DD/MM/YYYY
+        /.*\b\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/,               // YYYY/MM/DD
+        /.*\b[A-Z][a-z]+\s+\d{1,2},\s+\d{4}$/,             // March 15, 2024
+        /.*\b\d{1,2}\s+[A-Z][a-z]+\s+\d{4}$/               // 15 March 2024
+      ];
+      
+      for (const pattern of sourcePatterns) {
+        if (pattern.test(lastLine)) {
+          return { 
+            isSource: true, 
+            confidence: 0.95, 
+            reason: 'Bibliography format detected' 
+          };
+        }
+      }
+      
+      // Additional heuristics for edge cases
+      if (lastLine.includes('：') || lastLine.includes(':')) {
+        return { isSource: true, confidence: 0.7, reason: 'Contains colon separator' };
+      }
+      
+      // Year at end of line
+      if (/\b(19|20)\d{2}\b/.test(lastLine.slice(-20))) {
+        return { isSource: true, confidence: 0.6, reason: 'Ends with year' };
+      }
+      
+      // Short concluding line (likely citation)
+      if (lastLine.length < 30 && lines.length > 2) {
+        return { isSource: true, confidence: 0.4, reason: 'Short final line' };
+      }
+      
+      return { isSource: false, confidence: 0, reason: 'No citation format detected' };
+    }
+
+    // Show source indicator with split preview
+    function updateSourceIndicator(text) {
+      const indicator = document.getElementById('sourceIndicator');
+      const detection = detectSource(text);
+      
+      if (detection.isSource && detection.confidence > 0.5) {
+        indicator.className = 'absolute bottom-4 right-4 text-xs transition-all duration-500 text-green-400/60 opacity-100';
+        indicator.textContent = '◉';
+      } else if (detection.isSource && detection.confidence > 0.3) {
+        indicator.className = 'absolute bottom-4 right-4 text-xs transition-all duration-500 text-amber-500/60 opacity-100';
+        indicator.textContent = '◯';
+      } else {
+        indicator.className = 'absolute bottom-4 right-4 text-xs transition-all duration-500 opacity-0 pointer-events-none';
+        indicator.textContent = '';
+      }
+    }
+
+    // Initialize auto-resize on load
+    function initializeTextareas() {
+      const contentArea = document.getElementById('contentArea');
+      const referenceArea = document.getElementById('referenceArea');
+      autoResize(contentArea);
+      autoResize(referenceArea);
+      // Initialize character counter
+      updateCharacterCounter(contentArea, 'contentCounter');
+    }
+
+    // Generate unique noteId ensuring no conflicts within the same file
+    async function generateUniqueNoteId(content, reference, filename) {
+      // Get existing note IDs from the current file
+      const existingIds = await getExistingNoteIds(filename);
+      
+      let counter = 0;
+      let noteId = generateBaseNoteId(content, reference, counter);
+      
+      // Ensure uniqueness by incrementing counter if needed
+      while (existingIds.has(noteId)) {
+        counter++;
+        noteId = generateBaseNoteId(content, reference, counter);
+      }
+      
+      return noteId;
+    }
+    
+    // Generate base noteId using content + reference + timestamp + counter, then hash to 5 chars
+    function generateBaseNoteId(content, reference, counter = 0) {
+      const timestamp = Date.now().toString();
+      const combined = content.trim() + '|' + reference.trim() + '|' + timestamp + '|' + counter;
+      
+      // Better hash function (FNV-1a variant)
+      let hash = 2166136261 + counter; // Add counter to initial hash
+      for (let i = 0; i < combined.length; i++) {
+        hash ^= combined.charCodeAt(i);
+        hash = (hash * 16777619) >>> 0; // Keep as 32-bit unsigned
+      }
+      
+      // Convert to hex and take first 5 chars
+      return hash.toString(16).substring(0, 5);
+    }
+    
+    // Get existing note IDs from a file
+    async function getExistingNoteIds(filename) {
+      try {
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.notes(filename)}`);
+        if (!response.ok) return new Set();
+        
+        const data = await response.json();
+        return new Set(data.notes?.map((note) => note.id) || []);
+      } catch (error) {
+        console.warn('Failed to fetch existing note IDs:', error);
+        return new Set();
+      }
+    }
+
+    // Handle form submission
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+
+      // Prevent submission if message is currently showing
+      if (UIFeedback.isMessageShowing) {
+        return;
+      }
+
+      // Check if this is from keyboard shortcut with shouldClear parameter
+      const shouldClear = e.detail?.shouldClear !== false; // Default to true for button clicks
+      
+      const select = document.getElementById('fileSelect');
+      const contentArea = document.getElementById('contentArea');
+      const referenceArea = document.getElementById('referenceArea');
+      
+      const filename = select.value;
+      const content = contentArea.value;
+      const reference = referenceArea.value;
+      
+      if (!filename) {
+        await UIFeedback.showMessage('Please select a chapter', 'error');
+        return;
+      }
+      
+      if (!content.trim()) {
+        // await UIFeedback.showMessage('empty notes', 'error');
+        // Reload chapters and notes to refresh the interface
+        await loadFiles();
+        if (filename) {
+          await loadNotesForChapter(filename);
+        }
+        return;
+      }
+
+      // Check if we're in edit mode by looking at selected noteId
+      const noteIdSelect = document.getElementById('noteIdSelect');
+      const selectedNoteId = noteIdSelect.value;
+      const isEditMode = !!selectedNoteId;
+      
+      // In edit mode, use original reference content to preserve quotes/source
+      const finalReference = isEditMode ? EditorState.originalReference : reference;
+      
+      // Only generate new noteId for append mode
+      let currentNoteId;
+      if (isEditMode) {
+        currentNoteId = selectedNoteId.replace(/^#/, ''); // Clean the # prefix from selected ID
+      } else {
+        const noteId = await generateUniqueNoteId(content.trim(), reference.trim(), filename);
+        currentNoteId = noteId;
+      }
+      
+      // Format as Note component with smart source detection (same logic for both modes)
+      let finalContent;
+      if (finalReference.trim()) {
+        const detection = detectSource(finalReference.trim());
+        
+        if (detection.isSource && detection.confidence > 0.5) {
+          // Auto-split detected source from reference content
+          const referenceLines = finalReference.trim().split('\n').filter(line => line.trim());
+          const source = referenceLines[referenceLines.length - 1];
+          const referenceContent = referenceLines.slice(0, -1).join('\n').trim();
+          
+          if (referenceContent) {
+            finalContent = `<Note id="${currentNoteId}">\n${content.trim()}\n///\n${referenceContent}\n///\n${source}\n</Note>`;
+          } else {
+            // Only source, no reference content
+            finalContent = `<Note id="${currentNoteId}">\n${content.trim()}\n///\n\n///\n${source}\n</Note>`;
+          }
+        } else {
+          // No source detected, treat entire reference as reference content
+          finalContent = `<Note id="${currentNoteId}">\n${content.trim()}\n///\n${finalReference.trim()}\n///\nSource: [Please add source information]\n</Note>`;
+        }
+      } else {
+        finalContent = `<Note id="${currentNoteId}">\n${content.trim()}\n</Note>`;
+      }
+
+      // Disable submit button temporarily
+      const submitBtn = document.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = isEditMode ? 'Saving...' : 'Committing...';
+      submitBtn.disabled = true;
+
+      try {
+        let response;
+        if (isEditMode) {
+          // Update existing note
+          response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.updateNote(currentNoteId)}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+              filename, 
+              content: finalContent,
+              noteId: currentNoteId
+            })
+          });
+        } else {
+          // Append new note
+          response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.append}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filename, content: finalContent })
+          });
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          if (isEditMode) {
+            await UIFeedback.showMessage(`Note #${currentNoteId} updated successfully`, 'success');
+            if (shouldClear) {
+              clearEditorAndReset(true);
+            }
+          } else {
+            await UIFeedback.showMessage('Content committed successfully', 'success');
+            if (shouldClear) {
+              clearEditorAndReset(false);
+            }
+          }
+
+          // Refresh chapters and notes after successful commit
+          await loadFiles();
+          const fileSelect = document.getElementById('fileSelect');
+          if (fileSelect.value) {
+            await loadNotesForChapter(fileSelect.value);
+          }
+
+          // Handle note ID management based on clear behavior
+          if (shouldClear) {
+            // Clear mode: reset to append mode
+            EditorState.currentNoteId = '';
+            const noteIdSelect = document.getElementById('noteIdSelect');
+            noteIdSelect.value = '';
+          } else {
+            // No clear mode (Ctrl+S): ensure we're in edit mode for the current note
+            if (!isEditMode && currentNoteId) {
+              // We just created a new note, set it as selected for continued editing AFTER refresh
+              const noteIdSelect = document.getElementById('noteIdSelect');
+              noteIdSelect.value = `#${currentNoteId}`;
+              EditorState.currentNoteId = currentNoteId;
+
+              // Set original reference to preserve it for future edits
+              EditorState.originalReference = reference;
+
+              // Set UI to edit mode
+              const referenceArea = document.getElementById('referenceArea');
+              referenceArea.disabled = true;
+              referenceArea.style.backgroundColor = '#f9f9f9';
+              referenceArea.style.color = '#999';
+            } else if (isEditMode && EditorState.currentNoteId) {
+              // Already in edit mode, maintain the selection after refresh
+              const noteIdSelect = document.getElementById('noteIdSelect');
+              noteIdSelect.value = `#${EditorState.currentNoteId}`;
+
+              // Ensure EditorState.originalReference is preserved
+              EditorState.originalReference = EditorState.originalReference || reference;
+            }
+          }
+        } else {
+          await UIFeedback.showMessage(result.error || (isEditMode ? 'Failed to update' : 'Failed to commit'), 'error');
+        }
+      } catch (error) {
+        await UIFeedback.showMessage('Network error, please try again', 'error');
+      } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+      }
+    }
+
+    
+    // Update character counter
+    function updateCharacterCounter(textarea, counterId) {
+      const counter = document.getElementById(counterId);
+      const count = TextUtils.countCharacters(textarea.value);
+      counter.textContent = count.toLocaleString();
+    }
+    
+    // Editor State Management
+    const EditorState = {
+      isComposing: false,
+      allNotes: [],
+      selectedDropdownIndex: -1,
+      originalReference: '',
+      currentNoteId: '',
+
+      reset: function() {
+        this.currentNoteId = '';
+        this.originalReference = '';
+        this.selectedDropdownIndex = -1;
+      },
+
+      setCurrentNote: function(noteId, reference) {
+        this.currentNoteId = noteId;
+        this.originalReference = reference || '';
+      }
+    };
+
+    
+    // Handle composition start (pinyin input begins)
+    function handleCompositionStart(e) {
+      EditorState.isComposing = true;
+    }
+    
+    // Handle composition end (pinyin input finishes)
+    function handleCompositionEnd(e) {
+      EditorState.isComposing = false;
+      // Update counter after composition is complete
+      updateCharacterCounter(e.target, 'contentCounter');
+    }
+    
+    // Handle content area input
+    function handleContentAreaInput(e) {
+      autoResize(e.target);
+      // Only update counter if not in the middle of pinyin composition
+      if (!EditorState.isComposing) {
+        updateCharacterCounter(e.target, 'contentCounter');
+      }
+    }
+
+    // Handle reference area input
+    function handleReferenceAreaInput(e) {
+      const textarea = e.target;
+      autoResize(textarea);
+      updateSourceIndicator(textarea.value);
+    }
+
+    // Handle paste events specifically to prevent unwanted scrolling
+    function handleReferenceAreaPaste(e) {
+      const textarea = e.target;
+      
+      // Get paste data
+      const clipboardData = e.clipboardData || window.clipboardData;
+      const pastedData = clipboardData?.getData('Text') || '';
+      
+      // If it's a large paste, handle it specially
+      if (pastedData.length > 100) {
+        e.preventDefault(); // Prevent default paste behavior
+        
+        // Get current cursor position
+        const cursorStart = textarea.selectionStart;
+        
+        // Insert the text manually
+        const before = textarea.value.substring(0, cursorStart);
+        const after = textarea.value.substring(textarea.selectionEnd);
+        textarea.value = before + pastedData + after;
+        
+        // Set cursor position after pasted text
+        const newCursorPos = cursorStart + pastedData.length;
+        
+        // Resize without changing scroll position initially
+        autoResize(textarea, true);
+        
+        // Calculate where to scroll to show the pasted content
+        const textBeforeCursor = textarea.value.substring(0, newCursorPos);
+        const linesBeforeCursor = textBeforeCursor.split('\n').length;
+        const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 22;
+        const visibleLines = Math.floor(textarea.clientHeight / lineHeight);
+        
+        // Position cursor
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // Smart scroll: show some context above the cursor
+        const targetScrollTop = Math.max(0, (linesBeforeCursor - Math.floor(visibleLines * 0.7)) * lineHeight);
+        textarea.scrollTop = targetScrollTop;
+        
+        // Update source indicator
+        updateSourceIndicator(textarea.value);
+        
+        // Trigger input event for any other listeners
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        // For small pastes, use normal handling with slight delay
+        setTimeout(() => {
+          autoResize(textarea, true);
+          updateSourceIndicator(textarea.value);
+        }, 10);
+      }
+    }
+
+    // Handle keyboard shortcuts
+    async function handleKeyboardShortcuts(e) {
+      // Log the key event details
+      console.log('Key pressed:', {
+        key: e.key,
+        code: e.code,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        target: e.target.tagName
+      });
+
+      // Ensure the window has focus before processing shortcuts
+      if (!document.hasFocus()) {
+        return;
+      }
+      
+      // Only handle shortcuts if not typing in an input/textarea
+      const activeElement = document.activeElement;
+      const isTyping = activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA';
+      
+      // Ctrl+Enter/Cmd+Enter to commit and clear
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const submitEvent = new CustomEvent('submit', { detail: { shouldClear: true } });
+        document.getElementById('editorForm').dispatchEvent(submitEvent);
+        return;
+      }
+
+      // Ctrl+S/Cmd+S to commit without clearing (stay in edit mode)
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        const submitEvent = new CustomEvent('submit', { detail: { shouldClear: false } });
+        document.getElementById('editorForm').dispatchEvent(submitEvent);
+        return;
+      }
+      
+      // Ctrl+L or Cmd+L to clear all inputs and reset to initial state
+      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+        e.preventDefault();
+        clearEditorAndReset(true);
+        return;
+      }
+
+      // Ctrl+R or Cmd+R to load most recent note
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'r') {
+        e.preventDefault();
+        await loadMostRecentNote();
+        return;
+      }
+
+      // Ctrl+Shift+R or Cmd+Shift+R to refresh page
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+        e.preventDefault();
+        window.location.reload();
+        return;
+      }
+      
+      // Escape to blur active textarea/input or close shortcut helper
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        const helper = document.getElementById('shortcutHelper');
+        if (helper.style.opacity === '1') {
+          hideShortcutHelper();
+        } else if (isTyping) {
+          activeElement.blur();
+        }
+        return;
+      }
+      
+      // Forward slash (/) to focus note input
+      if (e.key === '/' && !isTyping) {
+        e.preventDefault();
+        const contentArea = document.getElementById('contentArea');
+        contentArea.focus();
+        // Move cursor to end of existing text
+        contentArea.setSelectionRange(contentArea.value.length, contentArea.value.length);
+      }
+
+      // Dot (.) to show keyboard shortcuts help
+      if (e.key === '.' && !isTyping) {
+        e.preventDefault();
+        showShortcutHelper();
+      }
+      
+      // Right bracket (]) to focus quotes/reference area
+      if (e.key === ']' && !isTyping) {
+        e.preventDefault();
+        const referenceArea = document.getElementById('referenceArea');
+        // Only focus if not disabled (not in edit mode)
+        if (!referenceArea.disabled) {
+          referenceArea.focus();
+          // Move cursor to end of existing text
+          referenceArea.setSelectionRange(referenceArea.value.length, referenceArea.value.length);
+        }
+      }
+      
+      // E key to focus note ID area
+      if (e.key === 'e' && !isTyping) {
+        e.preventDefault();
+        const noteIdSelect = document.getElementById('noteIdSelect');
+        // Only focus if not disabled
+        if (!noteIdSelect.disabled) {
+          noteIdSelect.focus();
+          // Select all text for easy replacement
+          noteIdSelect.select();
+        }
+      }
+    }
+
+
+    // Load notes for selected chapter
+    async function loadNotesForChapter(filename) {
+      const noteIdSelect = document.getElementById('noteIdSelect');
+      const dropdown = document.getElementById('noteIdDropdown');
+      
+      if (!filename) {
+        EditorState.allNotes = [];
+        noteIdSelect.value = '';
+        noteIdSelect.placeholder = 'Note ID or search...';
+        noteIdSelect.disabled = true;
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.notes(filename)}`);
+        const data = await response.json();
+        
+        if (data.notes && data.notes.length > 0) {
+          EditorState.allNotes = data.notes.map(note => ({
+            id: note.id,
+            preview: note.preview,
+            text: note.preview ? `#${note.id} - ${note.preview}` : `#${note.id}`
+          }));
+          noteIdSelect.disabled = false;
+          noteIdSelect.placeholder = 'Note';
+        } else {
+          EditorState.allNotes = [];
+          noteIdSelect.disabled = true;
+          noteIdSelect.placeholder = 'No notes found';
+        }
+        
+        noteIdSelect.value = '';
+        dropdown.classList.add('hidden');
+      } catch (error) {
+        console.error('Failed to load notes for chapter:', error);
+        EditorState.allNotes = [];
+        noteIdSelect.disabled = true;
+        noteIdSelect.placeholder = 'Error loading notes';
+        dropdown.classList.add('hidden');
+      }
+    }
+
+    // Filter and display notes based on search input
+    function filterNotes(searchTerm) {
+      const dropdown = document.getElementById('noteIdDropdown');
+      
+      if (EditorState.allNotes.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      let filtered;
+      if (!searchTerm.trim()) {
+        // Show all notes when no search term
+        filtered = EditorState.allNotes;
+      } else {
+        // Clean search term (remove # if present)
+        const cleanSearchTerm = searchTerm.replace(/^#/, '').toLowerCase();
+        
+        // Filter based on search term
+        filtered = EditorState.allNotes.filter(note =>
+          note.id.toLowerCase().includes(cleanSearchTerm) ||
+          (note.preview && note.preview.toLowerCase().includes(cleanSearchTerm))
+        );
+      }
+
+      if (filtered.length === 0) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      dropdown.innerHTML = filtered.map((note, index) => 
+        `<div class="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-xs font-normal text-gray-400 hover:text-gray-600 transition-colors duration-150 border-b border-gray-50 last:border-b-0 leading-tight dropdown-item ${index === 0 ? 'bg-gray-100' : ''}" style="font-size: 10px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" data-note-id="${note.id}" data-index="${index}">
+          ${note.text}
+        </div>`
+      ).join('');
+      
+      EditorState.selectedDropdownIndex = 0;
+
+      dropdown.classList.remove('hidden');
+    }
+
+    // Handle note selection from dropdown
+    async function selectNote(noteId) {
+      const noteIdSelect = document.getElementById('noteIdSelect');
+      const dropdown = document.getElementById('noteIdDropdown');
+      const referenceArea = document.getElementById('referenceArea');
+      
+      noteIdSelect.value = `#${noteId}`;
+      dropdown.classList.add('hidden');
+      
+      // Set UI to edit mode and load the note
+      referenceArea.disabled = true;
+      referenceArea.style.backgroundColor = '#f9f9f9';
+      referenceArea.style.color = '#999';
+      await loadNoteById(noteId);
+    }
+
+    // Handle chapter selection change
+    async function handleFileSelectChange(e) {
+      const select = e.target;
+      await loadNotesForChapter(select.value);
+      
+      // Clear content and reset to append mode when changing chapters
+      const contentArea = document.getElementById('contentArea');
+      const referenceArea = document.getElementById('referenceArea');
+      contentArea.value = '';
+      referenceArea.value = '';
+      referenceArea.disabled = false;
+      referenceArea.style.backgroundColor = '#fafafa';
+      referenceArea.style.color = '';
+      autoResize(contentArea);
+      autoResize(referenceArea);
+    }
+
+
+    // Load note by ID
+    async function loadNoteById(noteId) {
+      try {
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.note(noteId)}`);
+        if (!response.ok) {
+          throw new Error('Note not found');
+        }
+        
+        const data = await response.json();
+        
+        // Populate the form
+        const fileSelect = document.getElementById('fileSelect');
+        const contentArea = document.getElementById('contentArea');
+        const referenceArea = document.getElementById('referenceArea');
+        
+        fileSelect.value = data.filename;
+        contentArea.value = data.content;
+        referenceArea.value = data.reference;
+        
+        // Store original reference for edit mode and current note ID
+        EditorState.originalReference = data.reference || '';
+        EditorState.currentNoteId = noteId;
+        
+        // Auto-resize textareas and update counter
+        autoResize(contentArea);
+        autoResize(referenceArea);
+        updateSourceIndicator(referenceArea.value);
+        updateCharacterCounter(contentArea, 'contentCounter');
+        
+        await UIFeedback.showMessage(`Loaded note #${noteId}`, 'success');
+        
+      } catch (error) {
+        await UIFeedback.showMessage(`Failed to load note #${noteId}`, 'error');
+      }
+    }
+
+    // Load most recent note using existing allNotes array
+    async function loadMostRecentNote() {
+      const fileSelect = document.getElementById('fileSelect');
+
+      if (!fileSelect.value) {
+        await UIFeedback.showMessage('Please select a chapter first', 'info');
+        return;
+      }
+
+      if (EditorState.allNotes.length === 0) {
+        await UIFeedback.showMessage('No notes found in current chapter', 'info');
+        return;
+      }
+
+      // Get the last note (most recent)
+      const mostRecentNote = EditorState.allNotes[EditorState.allNotes.length - 1];
+
+      // Use existing selectNote function to load the note
+      await selectNote(mostRecentNote.id);
+    }
+
+    // Handle note selection change (UI state only, not loading)
+    function handleNoteIdSelectChange(e) {
+      const select = e.target;
+      let noteId = select.value;
+      const referenceArea = document.getElementById('referenceArea');
+      
+      // Clean noteId (remove # if present)
+      if (noteId) {
+        noteId = noteId.replace(/^#/, '');
+      }
+      
+      if (noteId) {
+        // Edit mode UI: just disable reference area, don't load note
+        referenceArea.disabled = true;
+        referenceArea.style.backgroundColor = '#f9f9f9';
+        referenceArea.style.color = '#999';
+      } else {
+        // Append mode: enable reference area
+        referenceArea.disabled = false;
+        referenceArea.style.backgroundColor = '#fafafa';
+        referenceArea.style.color = '';
+      }
+    }
+    
+
+    // Handle window load
+    function handleWindowLoad() {
+      initializeTextareas();
+      // document.getElementById('contentArea').focus();
+    }
+
+    // Handle note ID input (search functionality)
+    function handleNoteIdInput(e) {
+      const searchTerm = e.target.value;
+      filterNotes(searchTerm);
+    }
+    
+    // Handle keyboard navigation in note ID input
+    async function handleNoteIdKeydown(e) {
+      const dropdown = document.getElementById('noteIdDropdown');
+      const items = dropdown.querySelectorAll('.dropdown-item');
+      
+      if (dropdown.classList.contains('hidden') || items.length === 0) {
+        return;
+      }
+      
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          EditorState.selectedDropdownIndex = Math.min(EditorState.selectedDropdownIndex + 1, items.length - 1);
+          updateDropdownSelection(items);
+          break;
+          
+        case 'ArrowUp':
+          e.preventDefault();
+          EditorState.selectedDropdownIndex = Math.max(EditorState.selectedDropdownIndex - 1, -1);
+          updateDropdownSelection(items);
+          break;
+          
+        case 'Enter':
+          e.preventDefault();
+          if (EditorState.selectedDropdownIndex >= 0 && EditorState.selectedDropdownIndex < items.length) {
+            const selectedItem = items[EditorState.selectedDropdownIndex];
+            const noteId = selectedItem.getAttribute('data-note-id');
+            await selectNote(noteId);
+          }
+          break;
+          
+        case 'Escape':
+          e.preventDefault();
+          dropdown.classList.add('hidden');
+          EditorState.selectedDropdownIndex = -1;
+          break;
+      }
+    }
+    
+    // Update visual selection in dropdown
+    function updateDropdownSelection(items) {
+      items.forEach((item, index) => {
+        if (index === EditorState.selectedDropdownIndex) {
+          item.classList.add('bg-gray-100');
+          item.classList.remove('bg-gray-50');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('bg-gray-100');
+        }
+      });
+    }
+
+    // Handle note ID input focus
+    function handleNoteIdFocus(e) {
+      if (EditorState.allNotes.length > 0) {
+        // Show all notes on focus, regardless of current input value
+        filterNotes(e.target.value);
+      }
+    }
+    
+    // Handle note ID input blur - revert to current note if any
+    function handleNoteIdBlur(e) {
+      const noteIdSelect = e.target;
+      if (EditorState.currentNoteId) {
+        // Revert to current note being edited
+        noteIdSelect.value = `#${EditorState.currentNoteId}`;
+      } else {
+        // Clear field if no current note
+        noteIdSelect.value = '';
+      }
+    }
+
+    // Handle clicks on dropdown items
+    async function handleDropdownClick(e) {
+      const item = e.target.closest('[data-note-id]');
+      if (item) {
+        const noteId = item.getAttribute('data-note-id');
+        await selectNote(noteId);
+      }
+    }
+
+    // Hide dropdown when clicking outside
+    function handleDocumentClick(e) {
+      const noteIdSelect = document.getElementById('noteIdSelect');
+      const dropdown = document.getElementById('noteIdDropdown');
+      
+      if (!noteIdSelect.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    }
+
+    // Attach event handlers
+    document.getElementById('editorForm').addEventListener('submit', handleFormSubmit);
+    document.getElementById('contentArea').addEventListener('input', handleContentAreaInput);
+    document.getElementById('contentArea').addEventListener('compositionstart', handleCompositionStart);
+    document.getElementById('contentArea').addEventListener('compositionend', handleCompositionEnd);
+    document.getElementById('referenceArea').addEventListener('input', handleReferenceAreaInput);
+    document.getElementById('referenceArea').addEventListener('paste', handleReferenceAreaPaste);
+    document.addEventListener('keydown', handleKeyboardShortcuts);
+    document.addEventListener('contextmenu', (e) => e.preventDefault()); // Disable right-click
+
+    // Shortcut helper event listeners
+    document.getElementById('closeShortcutHelper').addEventListener('click', hideShortcutHelper);
+    document.getElementById('shortcutHelper').addEventListener('click', (e) => {
+      if (e.target.id === 'shortcutHelper') hideShortcutHelper(); // Click outside modal to close
+    });
+
+    document.getElementById('fileSelect').addEventListener('change', handleFileSelectChange);
+    document.getElementById('noteIdSelect').addEventListener('change', handleNoteIdSelectChange);
+    document.getElementById('noteIdSelect').addEventListener('input', handleNoteIdInput);
+    document.getElementById('noteIdSelect').addEventListener('focus', handleNoteIdFocus);
+    document.getElementById('noteIdSelect').addEventListener('blur', handleNoteIdBlur);
+    document.getElementById('noteIdSelect').addEventListener('keydown', handleNoteIdKeydown);
+    document.getElementById('noteIdDropdown').addEventListener('click', handleDropdownClick);
+    document.addEventListener('click', handleDocumentClick);
+    window.addEventListener('load', handleWindowLoad);
+
+    // Files are now loaded by the window load event handler above
+  </script>
+</body>
+</html>
