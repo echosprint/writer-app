@@ -7,7 +7,25 @@ module.exports = {
     icon: './assets/icon',
     extraResource: [
       './public'
-    ]
+    ],
+    ignore: [
+      /^\/out\//,
+      /^\/\.git\//,
+      /^\/node_modules\/(?!electron)/,
+      /^\/create-icon\.html$/,
+      /^\/create-icns\.html$/,
+      /^\/assets\/icon\.iconset\//,
+      /^\/assets\/icon\.svg$/,
+      /\.md$/,
+      /\.log$/,
+      /\.gitignore$/,
+      /package-lock\.json$/,
+      /^\/\.vscode\//,
+      /^\/\.DS_Store$/,
+      /\.map$/
+    ],
+    prune: true,
+    electronVersion: require('electron/package.json').version
   },
   rebuildConfig: {},
   makers: [
@@ -18,6 +36,9 @@ module.exports = {
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin'],
+      config: {
+        compression: 'maximum'
+      }
     },
     {
       name: '@electron-forge/maker-deb',

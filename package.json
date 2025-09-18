@@ -26,8 +26,9 @@
     },
     "files": [
       "src/**/*",
-      "public/**/*",
-      "assets/**/*"
+      "public/styles.css",
+      "assets/icon.icns",
+      "CHAPTERS_DIR.txt"
     ],
     "icon": "assets/icon.svg",
     "mac": {
