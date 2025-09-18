@@ -1,7 +1,32 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs').promises;
 const { join } = require('path');
-const CHAPTERS_DIR = join(__dirname, 'chapters');
+
+// Function to get chapters directory from config file or default
+async function getChaptersDir() {
+  const configFiles = [
+    join(__dirname, '..', 'CHAPTERS_DIR'),
+    join(__dirname, '..', 'CHAPTERS_DIR.txt')
+  ];
+
+  for (const configFile of configFiles) {
+    try {
+      const content = await fs.readFile(configFile, 'utf8');
+      const chaptersPath = content.split('\n')[0].trim();
+      if (chaptersPath) {
+        return chaptersPath;
+      }
+    } catch (error) {
+      // File doesn't exist, continue to next
+    }
+  }
+
+  // Default fallback to current working directory
+  return process.cwd();
+}
+
+// Initialize CHAPTERS_DIR
+let CHAPTERS_DIR = process.cwd();
 
 let mainWindow = null;
 
@@ -232,7 +257,7 @@ function createWindow() {
   });
 
   // Load the index.html file
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile('src/index.html');
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
@@ -317,7 +342,11 @@ ipcMain.handle('log', async (event, level, message, ...args) => {
 // =============================================================================
 
 // This method will be called when Electron has finished initialization
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Load chapters directory from config file
+  CHAPTERS_DIR = await getChaptersDir();
+  log('info', `Using chapters directory: ${CHAPTERS_DIR}`);
+
   createWindow();
   log('info', 'Writer app started successfully');
 });

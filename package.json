@@ -2,10 +2,11 @@
   "name": "writer",
   "version": "1.0.0",
   "description": "Writer - Electron app for managing book chapters and notes",
-  "main": "main.js",
+  "main": "src/main.js",
   "scripts": {
     "start": "electron-forge start",
     "dev": "NODE_ENV=development electron .",
+    "build-css": "tailwindcss -i ./src/styles.css -o ./public/styles.css --minify",
     "build": "electron-builder",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
@@ -24,11 +25,11 @@
       "output": "dist"
     },
     "files": [
-      "main.js",
-      "preload.js",
-      "index.html",
-      "src/**/*"
+      "src/**/*",
+      "public/**/*",
+      "assets/**/*"
     ],
+    "icon": "assets/icon.svg",
     "mac": {
       "category": "public.app-category.productivity"
     },

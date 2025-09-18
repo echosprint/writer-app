@@ -4,6 +4,10 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    icon: './assets/icon',
+    extraResource: [
+      './public'
+    ]
   },
   rebuildConfig: {},
   makers: [
@@ -24,6 +28,13 @@ module.exports = {
       config: {},
     },
   ],
+  hooks: {
+    generateAssets: async () => {
+      const { execSync } = require('child_process');
+      console.log('Building CSS...');
+      execSync('npm run build-css', { stdio: 'inherit' });
+    }
+  },
   plugins: [
     {
       name: '@electron-forge/plugin-auto-unpack-natives',
