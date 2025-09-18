@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const fs = require('fs').promises;
 const { join } = require('path');
 
@@ -238,6 +238,35 @@ async function handleUpdateNote(event, noteId, filename, content) {
   }
 }
 
+async function handleSelectChaptersDirectory() {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Select Chapters Directory',
+      defaultPath: CHAPTERS_DIR,
+      properties: ['openDirectory']
+    });
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selectedPath = result.filePaths[0];
+
+      // Save to CHAPTERS_DIR.txt
+      const configPath = join(__dirname, '..', 'CHAPTERS_DIR.txt');
+      await fs.writeFile(configPath, selectedPath, 'utf8');
+
+      // Update current CHAPTERS_DIR
+      CHAPTERS_DIR = selectedPath;
+
+      log('info', `Chapters directory updated to: ${selectedPath}`);
+      return { success: true, path: selectedPath };
+    }
+
+    return { success: false, canceled: true };
+  } catch (error) {
+    log('error', 'Error selecting chapters directory:', error);
+    throw error;
+  }
+}
+
 // =============================================================================
 // ELECTRON APP SETUP
 // =============================================================================
@@ -285,6 +314,7 @@ ipcMain.handle('append-content', handleAppendContent);
 ipcMain.handle('get-notes', handleGetNotes);
 ipcMain.handle('get-note', handleGetNote);
 ipcMain.handle('update-note', handleUpdateNote);
+ipcMain.handle('select-chapters-directory', handleSelectChaptersDirectory);
 
 // File system operations
 ipcMain.handle('read-file', async (event, filepath) => {

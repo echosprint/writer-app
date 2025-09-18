@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getNote: (noteId) => ipcRenderer.invoke('get-note', noteId),
   updateNote: (noteId, filename, content) => ipcRenderer.invoke('update-note', noteId, filename, content),
 
+  // Directory selection
+  selectChaptersDirectory: () => ipcRenderer.invoke('select-chapters-directory'),
+
 
   // File system operations
   readFile: (filepath) => ipcRenderer.invoke('read-file', filepath),
