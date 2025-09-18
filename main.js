@@ -220,8 +220,8 @@ async function handleUpdateNote(event, noteId, filename, content) {
 function createWindow() {
   // Create the browser window
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 450,
+    height: 750,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

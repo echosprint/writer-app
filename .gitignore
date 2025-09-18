@@ -2,3 +2,4 @@ node_modules
 writer
 chapters
 public/styles.css
+out/
